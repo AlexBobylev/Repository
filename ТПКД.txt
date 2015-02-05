@@ -1,0 +1,316 @@
+const double C = 4.60517;
+const double Hu = 42500000;
+const double ALFA = 2;
+const double D = 0.085;
+const double S = 0.085;
+const double E0 = 10.50;
+const double lam = 0.323;
+const double n = 5000;
+const double Tw = 473;
+const double Pa = 100000;
+const double Paa = 102000;
+
+double Vcv(double);
+double Cvo(double);
+double Cpo(double);
+double pressure(double, double, double, double);
+double work_done(double, double, double, double);
+double dV(double);
+double dV1(double);
+double Fcyl(double);
+double ALFw(double, double, double, double);
+double dQ(double, double, double, double);
+double G(double, double, double, double);
+
+void main()
+{
+	setlocale(LC_CTYPE, "Russian");
+	if (!get_data())
+	{
+		cerr << "Хер тебе в рыло, сраный урод!!!" << endl;
+		_getch();
+		return;
+	}
+	//Заполнение массивов
+	for (short i = 478; i < 950; ++i)
+		V[i] = Vcv(i);
+
+	//Начальные условия
+	T[478] = 1591; //Кельвины
+	P[478] = 658600; //Паскали
+	M2[478] = (P[478] * V[478]) / (Rm*T[478]);
+	M1[478] = 0;
+	po = P[478] * (0.75*0.028+0.05*0.032+0.12*0.044+0.04*0.028+0.04*0.018) / Rm / T[478];
+	po1 = 100000 * 0.029 / Rm / 290;
+
+	//Проходное сечение клапанов
+	for (short i = 689; i <= 791; ++i)
+		mf1[i] = (i-689)*0.06598;
+	for (short i = 791; i <= 847; ++i)
+		mf1[i] = 6.73;
+	for (short i = 847; i <= 949; ++i)
+		mf1[i] =(949-i) * 0.06598;
+
+	for (short i = 478; i <= 580; ++i)
+		mf2[i] = (i - 478)*0.06882;
+	for (short i = 580; i <= 652; ++i)
+		mf2[i] = 7.02;
+	for (short i = 652; i <= 754; ++i)
+		mf2[i] = (754 - i) * 0.06882;
+
+	
+
+	//Основной расчет
+	for (short i = 478; i <= 540; ++i)
+	{
+		if (P[i] / Pa > 1)
+		{
+			dM2[i] = G(mf2[i], Pa,P[i],po) / (0.75*0.028 + 0.05*0.032 + 0.12*0.044 + 0.04*0.028 + 0.04*0.018);
+		}
+		else
+		{
+			dM2[i] = G(mf2[i], P[i], Pa, po) / (0.75*0.028 + 0.05*0.032 + 0.12*0.044 + 0.04*0.028 + 0.04*0.018);
+		}
+		M2[i+1] = M2[i] - dM2[i];
+		K1 = (dQ(i, T[i], 0, M2[i]) - work_done(i, T[i], 0, M2[i]) - Cvo(T[i])*T[i] * (-dM2[i]) - Cpo(T[i])*T[i] * (dM2[i])) / (Cvo(T[i])*M2[i]);
+		K2 = (dQ(i + 0.5, T[i] + K1 / 2, 0, (M2[i] + M2[i - 1]) / 2) - work_done(i + 0.5, T[i] + K1 / 2, 0, (M2[i] + M2[i - 1]) / 2) - Cvo(T[i]+K1/2)*(T[i]+K1/2) * (-dM2[i]/2) - Cpo(T[i]+K1/2)*(T[i]+K1/2) * (dM2[i]/2)) / (Cvo(T[i]+K1/2)*(M2[i]+M2[i-1])/2);
+		K3 = (dQ(i + 0.5, T[i] + K2 / 2, 0, (M2[i] + M2[i - 1]) / 2) - work_done(i + 0.5, T[i] + K2 / 2, 0, (M2[i] + M2[i - 1]) / 2) - Cvo(T[i] + K2 / 2)*(T[i] + K2 / 2) * (-dM2[i] / 2) - Cpo(T[i] + K2 / 2)*(T[i] + K1 / 2) * (dM2[i] / 2)) / (Cvo(T[i] + K2 / 2)*(M2[i] + M2[i - 1]) / 2);
+		K4 = (dQ(i+1, T[i]+K3, 0, M2[i+1]) - work_done(i+1, T[i]+K3, 0, M2[i+1]) - Cvo(T[i]+K3)*(T[i]+K3) * (-dM2[i]) - Cpo(T[i]+K3)*(T[i]+K3) * (dM2[i])) / (Cvo(T[i]+K3)*M2[i+1]);
+		T[i+1] = T[i] + (K1+2*K2+2*K3+K4)/6;
+		P[i+1] = pressure(i+1, T[i+1], M1[i+1], M2[i+1]);
+		po = P[i+1] * (0.75*0.028 + 0.05*0.032 + 0.12*0.044 + 0.04*0.028 + 0.04*0.018) / Rm / T[i+1];
+		cout << i << "\t" << T[i] << "\t" << P[i] << "\t" << M2[i] << endl;
+	}
+	
+	for (short i = 540; i <= 688; ++i)
+	{
+		if (P[i] / Pa > 1)
+		{
+			dM2[i] = G(mf2[i], Pa, P[i], po) / (0.75*0.028 + 0.05*0.032 + 0.12*0.044 + 0.04*0.028 + 0.04*0.018);
+		}
+		else
+		{
+			dM2[i] = G(mf2[i], P[i], Pa, po) / (0.75*0.028 + 0.05*0.032 + 0.12*0.044 + 0.04*0.028 + 0.04*0.018);
+		}
+		M2[i + 1] = M2[i] - dM2[i];
+		K1 = (dQ(i, T[i], 0, M2[i]) + work_done(i, T[i], 0, M2[i]) - Cvo(T[i])*T[i] * (-dM2[i]) - Cpo(T[i])*T[i] * (dM2[i])) / (Cvo(T[i])*M2[i]);
+		K2 = (dQ(i + 0.5, T[i] + K1 / 2, 0, (M2[i] + M2[i - 1]) / 2) + work_done(i + 0.5, T[i] + K1 / 2, 0, (M2[i] + M2[i - 1]) / 2) - Cvo(T[i] + K1 / 2)*(T[i] + K1 / 2) * (-dM2[i] / 2) - Cpo(T[i] + K1 / 2)*(T[i] + K1 / 2) * (dM2[i] / 2)) / (Cvo(T[i] + K1 / 2)*(M2[i] + M2[i - 1]) / 2);
+		K3 = (dQ(i + 0.5, T[i] + K2 / 2, 0, (M2[i] + M2[i - 1]) / 2) + work_done(i + 0.5, T[i] + K2 / 2, 0, (M2[i] + M2[i - 1]) / 2) - Cvo(T[i] + K2 / 2)*(T[i] + K2 / 2) * (-dM2[i] / 2) - Cpo(T[i] + K2 / 2)*(T[i] + K1 / 2) * (dM2[i] / 2)) / (Cvo(T[i] + K2 / 2)*(M2[i] + M2[i - 1]) / 2);
+		K4 = (dQ(i + 1, T[i] + K3, 0, M2[i + 1]) + work_done(i + 1, T[i] + K3, 0, M2[i + 1]) - Cvo(T[i] + K3)*(T[i] + K3) * (-dM2[i]) - Cpo(T[i] + K3)*(T[i] + K3) * (dM2[i])) / (Cvo(T[i] + K3)*M2[i + 1]);
+		T[i + 1] = T[i] + (K1 + 2 * K2 + 2 * K3 + K4) / 6;
+		P[i + 1] = pressure(i + 1, T[i + 1], M1[i + 1], M2[i + 1]);
+		po = P[i + 1] * (0.75*0.028 + 0.05*0.032 + 0.12*0.044 + 0.04*0.028 + 0.04*0.018) / Rm / T[i + 1];
+		cout << i << "\t" << T[i] << "\t" << P[i] << "\t" << M2[i] << endl;
+	}
+
+	for (short i = 688; i <= 720; ++i)
+	{
+		if (P[i] / Pa > 1)
+		{
+			dM2[i] = G(mf2[i], Pa, P[i], po) / (0.75*0.028 + 0.05*0.032 + 0.12*0.044 + 0.04*0.028 + 0.04*0.018);
+		}
+		else
+		{
+			dM2[i] = -G(mf2[i], P[i], Pa, po) / (0.75*0.028 + 0.05*0.032 + 0.12*0.044 + 0.04*0.028 + 0.04*0.018);
+		}
+
+		if (P[i] / Paa > 1)
+		{
+			dM1[i] = -G(mf1[i], Paa, P[i], po1) / 0.028966;
+		}
+		else
+		{
+			dM1[i] = G(mf1[i], P[i], Paa, po1) / 0.028966;
+		}
+		M2[i+1] = M2[i] - dM2[i];
+		M1[i+1] = M1[i] + dM1[i];
+		dT = (dQ(i, T[i - 1], M1[i], M2[i]) + work_done(i, T[i - 1], M1[i], M2[i]) - Cvo(T[i - 1])*T[i - 1] * (dM1[i]-dM2[i])+29.5*dM1[i]*290 - Cpo(T[i - 1])*T[i - 1] * (dM2[i])) / (Cvo(T[i - 1])*(M1[i]+M2[i]));
+		K1 = (dQ(i, T[i], M1[i], M2[i]) + work_done(i, T[i], M1[i], M2[i]) - Cvo(T[i])*T[i] * (dM1[i] - dM2[i]) + 29.5*dM1[i] * 290 - Cpo(T[i])*T[i] * (dM2[i])) / (Cvo(T[i])*(M1[i]+M2[i]));
+		K2 = (dQ(i + 0.5, T[i] + K1 / 2, (M1[i] + M1[i - 1]) / 2, (M2[i] + M2[i - 1]) / 2) + work_done(i + 0.5, T[i] + K1 / 2, (M1[i] + M1[i - 1]) / 2, (M2[i] + M2[i - 1]) / 2) - Cvo(T[i] + K1 / 2)*(T[i] + K1 / 2) * (dM1[i] / 2 - dM2[i] / 2) + 29.5*dM1[i] * 290/2 - Cpo(T[i] + K1 / 2)*(T[i] + K1 / 2) * (dM2[i] / 2)) / (Cvo(T[i] + K1 / 2)*(M1[i] + M1[i - 1] + M2[i] + M2[i - 1]) / 2);
+		K3 = (dQ(i + 0.5, T[i] + K2 / 2, (M1[i] + M1[i - 1]) / 2, (M2[i] + M2[i - 1]) / 2) + work_done(i + 0.5, T[i] + K2 / 2, (M1[i] + M1[i - 1]) / 2, (M2[i] + M2[i - 1]) / 2) - Cvo(T[i] + K2 / 2)*(T[i] + K2 / 2) * (dM1[i] / 2 - dM2[i] / 2) + 29.5*dM1[i] * 290 / 2 - Cpo(T[i] + K2 / 2)*(T[i] + K2 / 2) * (dM2[i] / 2)) / (Cvo(T[i] + K2 / 2)*(M1[i] + M1[i - 1] + M2[i] + M2[i - 1]) / 2);
+		K4 = (dQ(i + 1, T[i] + K3, M1[i + 1], M2[i + 1]) + work_done(i + 1, T[i] + K3, M1[i + 1], M2[i + 1]) - Cvo(T[i] + K3)*(T[i] + K3) * (dM1[i] - dM2[i]) + 29.5*dM1[i] * 290 - Cpo(T[i] + K3)*(T[i] + K3) * (dM2[i])) / (Cvo(T[i] + K3)*(M1[i + 1] + M2[i + 1]));
+		T[i + 1] = T[i] + (K1 + 2 * K2 + 2 * K3 + K4) / 6;
+		P[i + 1] = pressure(i + 1, T[i + 1], M1[i + 1], M2[i + 1]);
+		po = P[i + 1] * (0.75*0.028 + 0.05*0.032 + 0.12*0.044 + 0.04*0.028 + 0.04*0.018) / Rm / T[i + 1];
+		cout << i << "\t" << T[i] << "\t" << P[i] << "\t" << M1[i] << endl;
+	}
+
+	for (short i = 720; i <= 754; ++i)
+	{
+		if (P[i] / Pa > 1)
+		{
+			dM2[i] = G(mf2[i], Pa, P[i], po) / (0.75*0.028 + 0.05*0.032 + 0.12*0.044 + 0.04*0.028 + 0.04*0.018);
+		}
+		else
+		{
+			dM2[i] = -G(mf2[i], P[i], Pa, po) / (0.75*0.028 + 0.05*0.032 + 0.12*0.044 + 0.04*0.028 + 0.04*0.018);
+		}
+
+		if (P[i] / Paa > 1)
+		{
+			dM1[i] = -G(mf1[i], Paa, P[i], po1) / 0.028966;
+		}
+		else
+		{
+			dM1[i] = G(mf1[i], P[i], Paa, po1) / 0.028966;
+		}
+		M2[i + 1] = M2[i] - dM2[i];
+		M1[i + 1] = M1[i] + dM1[i];
+		dT = (dQ(i, T[i - 1], M1[i], M2[i]) - work_done(i, T[i - 1], M1[i], M2[i]) - Cvo(T[i - 1])*T[i - 1] * (dM1[i] - dM2[i]) + 29.5*dM1[i] * 290 - Cpo(T[i - 1])*T[i - 1] * (dM2[i])) / (Cvo(T[i - 1])*(M1[i] + M2[i]));
+		K1 = (dQ(i, T[i], M1[i], M2[i]) - work_done(i, T[i], M1[i], M2[i]) - Cvo(T[i])*T[i] * (dM1[i] - dM2[i]) + 29.5*dM1[i] * 290 - Cpo(T[i])*T[i] * (dM2[i])) / (Cvo(T[i])*(M1[i] + M2[i]));
+		K2 = (dQ(i + 0.5, T[i] + K1 / 2, (M1[i] + M1[i - 1]) / 2, (M2[i] + M2[i - 1]) / 2) - work_done(i + 0.5, T[i] + K1 / 2, (M1[i] + M1[i - 1]) / 2, (M2[i] + M2[i - 1]) / 2) - Cvo(T[i] + K1 / 2)*(T[i] + K1 / 2) * (dM1[i] / 2 - dM2[i] / 2) + 29.5*dM1[i] * 290 / 2 - Cpo(T[i] + K1 / 2)*(T[i] + K1 / 2) * (dM2[i] / 2)) / (Cvo(T[i] + K1 / 2)*(M1[i] + M1[i - 1] + M2[i] + M2[i - 1]) / 2);
+		K3 = (dQ(i + 0.5, T[i] + K2 / 2, (M1[i] + M1[i - 1]) / 2, (M2[i] + M2[i - 1]) / 2) - work_done(i + 0.5, T[i] + K2 / 2, (M1[i] + M1[i - 1]) / 2, (M2[i] + M2[i - 1]) / 2) - Cvo(T[i] + K2 / 2)*(T[i] + K2 / 2) * (dM1[i] / 2 - dM2[i] / 2) + 29.5*dM1[i] * 290 / 2 - Cpo(T[i] + K2 / 2)*(T[i] + K2 / 2) * (dM2[i] / 2)) / (Cvo(T[i] + K2 / 2)*(M1[i] + M1[i - 1] + M2[i] + M2[i - 1]) / 2);
+		K4 = (dQ(i + 1, T[i] + K3, M1[i + 1], M2[i + 1]) - work_done(i + 1, T[i] + K3, M1[i + 1], M2[i + 1]) - Cvo(T[i] + K3)*(T[i] + K3) * (dM1[i] - dM2[i]) + 29.5*dM1[i] * 290 - Cpo(T[i] + K3)*(T[i] + K3) * (dM2[i])) / (Cvo(T[i] + K3)*(M1[i + 1] + M2[i + 1]));
+		T[i + 1] = T[i] + (K1 + 2 * K2 + 2 * K3 + K4) / 6;
+		P[i + 1] = pressure(i + 1, T[i + 1], M1[i + 1], M2[i+1]);
+		po = P[i + 1] * (0.75*0.028 + 0.05*0.032 + 0.12*0.044 + 0.04*0.028 + 0.04*0.018) / Rm / T[i + 1];
+		cout << i << "\t" << T[i] << "\t" << P[i] << "\t" << M1[i] << endl;
+	}
+
+	for (short i = 754; i <= 900; ++i)
+	{
+		if (P[i] / Paa > 1)
+		{
+			dM1[i] = -G(mf1[i], Paa, P[i], po1) / 0.028966;
+		}
+		else
+		{
+			dM1[i] = G(mf1[i], P[i], Paa, po1) / 0.028966;
+		}
+		M1[i+1] = M1[i] + dM1[i];
+		dT = (dQ(i, T[i - 1], M1[i], M2[754]) - work_done(i, T[i - 1], M1[i], M2[754]) - Cvo(T[i - 1])*T[i - 1] * (dM1[i]) + 29.5*dM1[i] * 290) / (Cvo(T[i - 1])*(M1[i] + M2[754]));
+		K1 = (dQ(i, T[i], M1[i], M2[754]) - work_done(i, T[i], M1[i], M2[754]) - Cvo(T[i])*T[i] * (dM1[i]) + 29.5*dM1[i] * 290 ) / (Cvo(T[i])*(M1[i] + M2[754]));
+		K2 = (dQ(i + 0.5, T[i] + K1 / 2, (M1[i] + M1[i - 1]) / 2, M2[754]) - work_done(i + 0.5, T[i] + K1 / 2, (M1[i] + M1[i - 1]) / 2, M2[754]) - Cvo(T[i] + K1 / 2)*(T[i] + K1 / 2) * (dM1[i] / 2) + 29.5*dM1[i] * 290 / 2) / (Cvo(T[i] + K1 / 2)*(M1[i] + M1[i - 1] + M2[754] + M2[754]) / 2);
+		K3 = (dQ(i + 0.5, T[i] + K2 / 2, (M1[i] + M1[i - 1]) / 2, M2[754]) - work_done(i + 0.5, T[i] + K2 / 2, (M1[i] + M1[i - 1]) / 2, M2[754]) - Cvo(T[i] + K2 / 2)*(T[i] + K2 / 2) * (dM1[i] / 2) + 29.5*dM1[i] * 290 / 2) / (Cvo(T[i] + K2 / 2)*(M1[i] + M1[i - 1] + M2[754] + M2[754]) / 2);
+		K4 = (dQ(i + 1, T[i] + K3, M1[i + 1], M2[754]) - work_done(i + 1, T[i] + K3, M1[i + 1], M2[754]) - Cvo(T[i] + K3)*(T[i] + K3) * (dM1[i]) + 29.5*dM1[i] * 290) / (Cvo(T[i] + K3)*(M1[i + 1] + M2[754]));
+		T[i + 1] = T[i] + (K1 + 2 * K2 + 2 * K3 + K4) / 6;
+		P[i + 1] = pressure(i + 1, T[i + 1], M1[i + 1], M2[754]);
+		cout << i << "\t" << T[i] << "\t" << P[i] << "\t" << M1[i] << endl;
+	}
+
+	for (short i = 900; i <= 949; ++i)
+	{
+		if (P[i] / Paa > 1)
+		{
+			dM1[i] = -G(mf1[i], Paa, P[i], po1) / 0.028966;
+		}
+		else
+		{
+			dM1[i] = G(mf1[i], P[i], Paa, po1) / 0.028966;
+		}
+		M1[i+1] = M1[i] + dM1[i];
+		dT = (dQ(i, T[i - 1], M1[i], M2[754]) + work_done(i, T[i - 1], M1[i], M2[754]) - Cvo(T[i - 1])*T[i - 1] * (dM1[i]) + 29.5*dM1[i] * 290) / (Cvo(T[i - 1])*(M1[i] + M2[754]));
+		K1 = (dQ(i, T[i], M1[i], M2[754]) + work_done(i, T[i], M1[i], M2[754]) - Cvo(T[i])*T[i] * (dM1[i]) + 29.5*dM1[i] * 290) / (Cvo(T[i])*(M1[i] + M2[754]));
+		K2 = (dQ(i + 0.5, T[i] + K1 / 2, (M1[i] + M1[i - 1]) / 2, M2[754]) + work_done(i + 0.5, T[i] + K1 / 2, (M1[i] + M1[i - 1]) / 2, M2[754]) - Cvo(T[i] + K1 / 2)*(T[i] + K1 / 2) * (dM1[i] / 2) + 29.5*dM1[i] * 290 / 2) / (Cvo(T[i] + K1 / 2)*(M1[i] + M1[i - 1] + M2[754] + M2[754]) / 2);
+		K3 = (dQ(i + 0.5, T[i] + K2 / 2, (M1[i] + M1[i - 1]) / 2, M2[754]) + work_done(i + 0.5, T[i] + K2 / 2, (M1[i] + M1[i - 1]) / 2, M2[754]) - Cvo(T[i] + K2 / 2)*(T[i] + K2 / 2) * (dM1[i] / 2) + 29.5*dM1[i] * 290 / 2) / (Cvo(T[i] + K2 / 2)*(M1[i] + M1[i - 1] + M2[754] + M2[754]) / 2);
+		K4 = (dQ(i + 1, T[i] + K3, M1[i + 1], M2[754]) + work_done(i + 1, T[i] + K3, M1[i + 1], M2[754]) - Cvo(T[i] + K3)*(T[i] + K3) * (dM1[i]) + 29.5*dM1[i] * 290) / (Cvo(T[i] + K3)*(M1[i + 1] + M2[754]));
+		T[i + 1] = T[i] + (K1 + 2 * K2 + 2 * K3 + K4) / 6;
+		P[i + 1] = pressure(i + 1, T[i + 1], M1[i + 1], M2[754]);
+		cout << i << "\t" << T[i] << "\t" << P[i] << "\t" << M1[i] << endl;
+	}
+
+	write_file(T, P);
+
+
+	_getch();
+}
+
+
+//Определение объема от угла поворота коленчатого вала
+double Vcv(double F)
+{
+	double	Ap = pi*D*D / 4;
+	double	Vh = Ap*S;
+	double	Vc = Vh / (E0 - 1);
+	double	Va = Vc + Vh;
+	double	alf = F*pi / 180;
+	double	Sp = (S / 2)*((1 - cos(alf)) + (1 / lam)*(1 - cos(asin(lam*sin(alf)))));
+	double V = Vc + Ap*Sp;
+	double Vcv = V;
+	return Vcv;
+}
+
+
+
+
+
+double pressure(double Fi, double T, double M1, double M2)
+{
+	double pressure = ((M1 + M2)*Rm*T) / Vcv(Fi);
+	return pressure;
+}
+
+double dV(double F)
+{
+	double alf = F*pi / 180;
+	double x = 1 - lam*lam*sin(alf)*sin(alf);
+	double dV = (pi*D*D*S / 8)*(sin(alf) + lam*sin(alf)*cos(alf) / pow(x, 0.5));
+	return dV;
+}
+
+
+
+//Определение площади цилиндра
+double Fcyl(double F)
+{
+	double	alf = F*pi / 180;
+	double	Sp = S - (S / 2)*((1 - cos(alf)) + (1 / lam)*(1 - cos(asin(lam*sin(alf)))));
+	double Fcyl = 2 * pi*D*Sp / 2;
+	return Fcyl;
+}
+//Определение коэффициента теплопередачи
+double ALFw(double F, double T, double M1, double M2)
+{
+	double Cm = S*n / 30;
+	double ALFw = 77.9*pow(Cm, 1. / 3)*pow(pressure(F, T, M1, M2)*T, 0.5) / 10000;
+	return ALFw;
+}
+//Определение dQ/dF
+double dQ(double F, double T, double M1, double M2)
+{
+	double omg = pi*n / 30;
+	double Fpist = pi*D*D / 4;
+	double Fhead = Fpist / 1.2;
+	double dQ = (ALFw(F, T, M1, M2) / 6/n)*((Tw - T)*Fpist + (Tw - T)*Fcyl(F) + (Tw - T)*Fhead);
+	return dQ;
+}
+
+double Cvo(double T)
+{
+	int i;
+	T = T - 273;
+	i = floor(T/100);
+	double Cvo = 0.75*(N2[i] + (N2[i + 1] - N2[i])*(T - floor(T / 100) * 100) / 100) + 0.05*(O2[i] + (O2[i + 1] - O2[i])*(T - floor(T / 100) * 100) / 100) + 0.12*(CO2[i] + (CO2[i + 1] - CO2[i])*(T - floor(T / 100) * 100) / 100) + 0.04*(CO[i] + (CO[i + 1] - CO[i])*(T - floor(T / 100) * 100) / 100) + 0.04*(H2O[i] + (H2O[i + 1] - H2O[i])*(T - floor(T / 100) * 100) / 100);
+	return Cvo;
+}
+double Cpo(double T)
+{
+	double Cpo = Cvo(T) + Rm;
+	return Cpo;
+}
+
+//Работа
+double work_done(double F, double T, double M1, double M2)
+{
+	double work_done = pressure(F, T, M1, M2)*dV1(F);
+	return work_done;
+}
+
+
+
+//Расход
+double G(double  mf, double P1, double P2, double po)
+{
+	double omg = pi*n / 30;
+	double G = 0.0001*mf*pow((7.26*(pow((P1 / P2), 1.45) - pow((P1 / P2), 1.725))), 0.5)*pow((P2*po), 0.5)/6/n;
+	return G;
+}
+
+
+double dV1(double F)
+{
+	double alf = F*pi / 180;
+	double x = 1 - lam*lam*sin(alf)*sin(alf);
+	double dV1 = Vcv(F) - Vcv(F - 1);
+	return dV1;
+}
